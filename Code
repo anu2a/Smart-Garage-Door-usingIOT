@@ -1,0 +1,89 @@
+//Code for IoT Smart Garage Door Opener
+
+//by iotdesignpro.com
+
+
+#include <ESP32Servo.h>
+#include <WiFi.h>
+Servo servo1;
+Servo servo2;
+const char* ssid = "0000";
+const char* password = "12345678";
+int pos = 0;
+WiFiServer server(80);     // Set port to 80
+String header;             // Stores the HTTP request
+String doorstate = "off";  // state of door
+void setup() {
+  servo1.attach(15);
+  servo2.attach(13);
+  Serial.begin(115200);
+  // Set the pinmode of the pins to which the LEDs are connected and turn them low to prevent flunctuations
+  //connect to access point
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  while (WiFi.status() != WL_CONNECTED) {
+  delay(500);
+  Serial.print(".");
+  }
+  // Print local IP address and start web server
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  server.begin();
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());  // this will display the Ip address of the Pi which should be entered into your browser
+}
+void loop() {
+WiFiClient client = server.available();  // Listen for incoming clients
+ if (client) {                   // If a new client connects,
+ String currentLine = "";      // make a String to hold incoming data from the client
+ while (client.connected()) {  // loop while the client's connected
+ if (client.available()) {   // if there's bytes to read from the client,
+ char c = client.read();   // read a byte, then
+ Serial.write(c);          // print it out the serial monitor
+ header += c;
+ if (c == '\n') {  // if the byte is a newline character
+  // if the current line is blank, you got two newline characters in a row.
+  // that's the end of the client HTTP request, so send a response:
+ if (currentLine.length() == 0) {
+ client.println("HTTP/1.1 200 OK");
+ client.println("Content-type:text/html");
+ client.println("Connection: close");
+ client.println();
+ if (header.indexOf("GET /door/on") >= 0) {
+ Serial.println("Door Open");
+ doorstate = "on";
+ while (pos < 100) {
+ Serial.println(pos);
+ servo1.write(pos);
+ servo2.write(180 - pos);
+ pos++;
+ delay(10);
+}
+} else if (header.indexOf("GET /door/off") >= 0) {
+  Serial.println("Door Close");
+  doorstate = "off";
+  while (pos > 0) {
+  servo1.write(pos);
+  servo2.write(180 - pos);
+  Serial.println(pos);
+  pos--;
+  delay(10);
+ }
+ }
+ // Display the HTML web page
+ client.println("<!DOCTYPE html><html>");
+ client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+ client.println("<link rel=\"icon\" href=\"data:,\">");
+ // CSS to style the on/off buttons
+ client.println("<style>html { font-family: Times New Roman; display: inline-block; margin: 0px auto; text-align: center;}");
+ client.println(".button { background-color: #195B6A; border: none; border-radius: 50%; color: white; padding: 16px 40px;");
+ client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
+ client.println(".button2 {background-color: #77878A;}</style></head>");
+ client.println("<body><h1>IoT Based Garage Door</h1>");
+ if (doorstate == "off") {
+ client.println("<p><a href=\"/door/on\"><button class=\"button\">Open</button></a></p>");
+ } else {
+ client.println("<p><a href=\"/door/off\"><button class=\"button button2\">Close</button></a></p>");
+ }
+ client.println("</body></html>
